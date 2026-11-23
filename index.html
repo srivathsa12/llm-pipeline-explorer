@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f0f0f0">
+  <title>LLM Pipeline Explorer</title>
+
+
+  <style>
+    /* // WHAT THIS DOES: Stores all the colours, sizes and spacing in one place,
+       so every part of the page uses the same values. Change a value here and
+       it changes everywhere. */
+    :root {
+      --bg: #f0f0f0;            /* page background (light grey) */
+      --bg-raise: #fcfcfc;      /* panel background (almost white) */
+      --ink: #181818;           /* main text colour */
+      --ink-2: #373735;         /* slightly softer text */
+      --muted: #5f5f5c;         /* hints and labels */
+      --line: rgba(24, 24, 24, .10);
+      --line-strong: rgba(24, 24, 24, .22);
+      --focus: #181818;
+
+      --font-sans: Geist, Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+
+      --t-mono: 12px;
+      --t-small: 14px;
+      --t-body: 16px;
+      --t-h2: clamp(26px, 1rem + 1.6vw, 38px);
+      --t-h1: clamp(38px, 1rem + 4vw, 72px);
+
+      --r-sm: 4px;
+      --r-md: 8px;
+      --hit: 44px;
+      --ease-out: cubic-bezier(.16, 1, .3, 1);
+    }
+
+    /* // WHAT THIS DOES: Basic page setup. Removes default browser spacing and
+       sets the font, colours and line height for the whole page. */
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }   /* hidden things stay hidden */
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: var(--t-body);
+      line-height: 1.5;
+      letter-spacing: -.01em;
+    }
+
+    /* // WHAT THIS DOES: A hidden "Skip to content" link. It only appears when a
+       keyboard user presses Tab, so they can jump past the title. */
+    .skip-link {
+      position: absolute;
+      left: 16px;
+      top: -60px;
+      background: var(--ink);
+      color: var(--bg-raise);
+      padding: 10px 14px;
+      border-radius: var(--r-sm);
+      z-index: 10;
+    }
+    .skip-link:focus { top: 16px; }
+
+    /* // WHAT THIS DOES: Keeps all content in a centred column that is never
+       wider than 1000px, with some space on the left and right. */
+    .wrap {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: clamp(40px, 6vw, 88px) clamp(16px, 3vw, 32px) 96px;
+    }
+
+    /* // WHAT THIS DOES: Styles the big page title and the short line under it. */
+    .page-head { margin-bottom: clamp(32px, 4vw, 56px); }
+    h1 {
+      margin: 0 0 14px;
+      font-size: var(--t-h1);
+      font-weight: 500;
+      line-height: .96;
+      letter-spacing: -.05em;
+      text-wrap: balance;
+    }
+    .intro {
+      margin: 0;
+      max-width: 56ch;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    /* // WHAT THIS DOES: Styles each "Part" box: a white panel with a thin
+       border and soft rounded corners. */
+    .part {
+      background: var(--bg-raise);
+      border-radius: var(--r-md);
+      box-shadow: 0 0 0 1px var(--line), 0 1px 1px rgba(0,0,0,.03), 0 4px 10px -6px rgba(0,0,0,.08);
+      padding: clamp(20px, 3vw, 36px);
+      margin-bottom: 24px;
+    }
+    .part-num {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: var(--t-mono);
+      letter-spacing: .04em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    h2 {
+      margin: 0 0 28px;
+      font-size: var(--t-h2);
+      font-weight: 500;
+      line-height: 1.02;
+      letter-spacing: -.04em;
+    }
+
+    /* // WHAT THIS DOES: Styles one form field: its label, its text box, and
+       the space below it. */
+    .field { margin-bottom: 20px; }
+    label, .group-label {
+      display: block;
+      font-size: var(--t-small);
+      font-weight: 500;
+      color: var(--ink-2);
+      margin-bottom: 8px;
+    }
+    textarea, input[type="text"] {
+      display: block;
+      width: 100%;
+      font-family: var(--font-mono);
+      font-size: 16px;            /* 16px stops phones from zooming in */
+      line-height: 1.55;
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-sm);
+      padding: 12px 14px;
+      min-height: var(--hit);
+      transition: border-color .2s var(--ease-out);
+    }
+    textarea { resize: vertical; }
+    textarea:hover, input[type="text"]:hover { border-color: rgba(24,24,24,.4); }
+    .hint {
+      margin: 8px 0 0;
+      font-size: var(--t-small);
+      color: var(--muted);
+    }
+
+    /* // WHAT THIS DOES: Styles the buttons. They are dark with light text,
+       darken a little on hover and shrink slightly when pressed. */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: var(--hit);
+      padding: 0 20px;
+      font-family: var(--font-sans);
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: -.01em;
+      color: #fcfcfc;
+      background: var(--ink);
+      border: 0;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: background-color .16s var(--ease-out), transform .1s var(--ease-out);
+    }
+    .btn:active { transform: scale(.97); }
+    @media (hover: hover) and (pointer: fine) {
+      .btn:hover { background-color: #3a3a38; }
+    }
+
+    /* // WHAT THIS DOES: Draws a clear outline around whatever the keyboard
+       is focused on, so keyboard users can always see where they are. */
+    :focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 3px;
+    }
+    textarea:focus-visible, input[type="text"]:focus-visible { outline-offset: 1px; }
+
+    /* // WHAT THIS DOES: Styles the result area under "Build vocabulary":
+       a short message line, then a table that scrolls inside its own box
+       when there are many words. */
+    .result { margin-top: 20px; }
+    .result[hidden] { display: none; }
+    .result-msg {
+      margin: 0 0 12px;
+      font-size: var(--t-small);
+      color: var(--ink-2);
+    }
+    .result-msg strong {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .result-msg.is-error { color: #a32a12; }
+    /* // WHAT THIS DOES: Styles the "Words kept" slider: the label line
+       above, and a full-width slider that is easy to grab on a phone. */
+    .slider-field { margin: 0 0 16px; }
+    .slider-field label { margin-bottom: 4px; }
+    .slider-field strong {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .slider-field input[type="range"] {
+      display: block;
+      width: 100%;
+      height: var(--hit);
+      margin: 0;
+      accent-color: var(--ink);
+      cursor: pointer;
+    }
+    .table-box {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-sm);
+      background: #fff;
+    }
+    .vocab-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--t-small);
+    }
+    .vocab-table th {
+      position: sticky;          /* header stays visible while you scroll */
+      top: 0;
+      background: var(--bg);
+      text-align: left;
+      font-weight: 500;
+      color: var(--ink-2);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line-strong);
+    }
+    .vocab-table td {
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+    .vocab-table tr:last-child td { border-bottom: 0; }
+    .vocab-table .num { text-align: right; width: 1%; white-space: nowrap; }
+    .vocab-table .unk td { color: var(--muted); }
+
+    /* // WHAT THIS DOES: Styles the token "chips": small coloured boxes with
+       the token on top and its ID number underneath. The colour itself is
+       set by JavaScript, from the ID. */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 0;
+      list-style: none;
+    }
+    .chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 48px;
+      padding: 8px 12px 6px;
+      border-radius: var(--r-sm);
+      border: 1px solid rgba(24, 24, 24, .14);
+      font-family: var(--font-mono);
+      color: var(--ink);
+    }
+    .chip-word { font-size: 15px; line-height: 1.3; white-space: pre; }
+    .chip-id {
+      font-size: 11px;
+      color: rgba(24, 24, 24, .62);
+      font-variant-numeric: tabular-nums;
+    }
+    /* A piece of a broken-up unknown word gets a dashed border. */
+    .chip.is-piece { border-style: dashed; border-color: rgba(24, 24, 24, .4); }
+
+    /* // WHAT THIS DOES: The note about unknown words, and the three numbers
+       (characters, tokens, characters per token) shown side by side. */
+    .note {
+      margin: 0 0 16px;
+      padding: 10px 14px;
+      border-left: 2px solid var(--ink);
+      background: var(--bg);
+      font-size: var(--t-small);
+      color: var(--ink-2);
+    }
+    .note[hidden] { display: none; }
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 40px;
+      margin: 0;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+    .stats div { margin: 0; }
+    .stats dt { font-size: var(--t-small); color: var(--muted); }
+    .stats dd {
+      margin: 2px 0 0;
+      font-family: var(--font-mono);
+      font-size: 24px;
+      letter-spacing: -.02em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* // WHAT THIS DOES: Draws a thin line between the two steps inside Part 1. */
+    .divider {
+      border: 0;
+      border-top: 1px solid var(--line);
+      margin: 32px 0 28px;
+    }
+
+    /* // WHAT THIS DOES: Styles the two radio buttons as a row of options
+       that are easy to tap. */
+    fieldset {
+      border: 0;
+      padding: 0;
+      margin: 0 0 24px;
+    }
+    legend { padding: 0; }
+    .radio-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 24px;
+    }
+    .radio-option {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: var(--hit);
+      font-size: var(--t-body);
+      font-weight: 400;
+      color: var(--ink);
+      margin: 0;
+      cursor: pointer;
+    }
+    .radio-option input {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: var(--ink);
+      cursor: pointer;
+    }
+
+    /* // WHAT THIS DOES: The empty box where the 3D chart will be drawn later.
+       It is exactly 520px tall and shows a short message for now. */
+    .chart-area {
+      height: 520px;
+      margin-top: 28px;
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--r-sm);
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      color: var(--muted);
+      font-size: var(--t-small);
+    }
+    /* When a chart is drawn, remove the dashed placeholder look. */
+    .chart-area.has-plot {
+      display: block;
+      padding: 0;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    #embedMsg { margin: 16px 0 0; }
+
+    /* // WHAT THIS DOES: A busy button (while the model downloads or the
+       sentences are being embedded) turns grey and shows a small spinning
+       circle after its label. The label itself stays the same. */
+    .btn:disabled { background: #6a6a68; cursor: progress; }
+    .btn[aria-busy="true"]::after {
+      content: "";
+      width: 12px;
+      height: 12px;
+      margin-left: 10px;
+      border: 2px solid rgba(252, 252, 252, .35);
+      border-top-color: #fcfcfc;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* // WHAT THIS DOES: The model download progress: a text line and a thin
+       bar that fills from left to right. */
+    .progress-box { margin-top: 16px; }
+    .progress-text {
+      margin: 0 0 8px;
+      font-size: var(--t-small);
+      color: var(--ink-2);
+      font-variant-numeric: tabular-nums;
+    }
+    .progress-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(24, 24, 24, .10);
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 100%;
+      background: var(--ink);
+      transform-origin: left center;
+      transform: scaleX(0);
+      transition: transform .2s var(--ease-out);
+    }
+
+    /* // WHAT THIS DOES: The "Closest pairs" table under the chart.
+       Sentences use the normal font; only the numbers use the mono font. */
+    .pairs { margin-top: 28px; }
+    .pairs h3 {
+      margin: 0 0 4px;
+      font-size: 20px;
+      font-weight: 500;
+      letter-spacing: -.03em;
+    }
+    .pairs .hint { margin: 0 0 12px; }
+    .pairs-table td.text { font-family: var(--font-sans); }
+    .pairs-table td { vertical-align: top; }
+
+    /* // WHAT THIS DOES: The "Try your own" results: the 8 numbers in a
+       grey box (wraps on small screens), and less space above the table. */
+    .vector-line {
+      margin: 0 0 8px;
+      padding: 10px 14px;
+      background: var(--bg);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+    .own-closest { margin-top: 20px; }
+    .own-closest h3 { margin-bottom: 12px; }
+    .divider + .field { margin-top: 0; }
+
+    /* // WHAT THIS DOES: If the user's device asks for less motion, turn off
+       the small button animations. */
+    @media (prefers-reduced-motion: reduce) {
+      * { transition-duration: .01s !important; }
+      .btn:active { transform: none; }
+      .btn[aria-busy="true"]::after { animation: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- // WHAT THIS DOES: The skip link for keyboard users (see the CSS above). -->
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <main id="main" class="wrap">
+
+    <!-- // WHAT THIS DOES: The page title and a one-line explanation. -->
+    <header class="page-head">
+      <h1>LLM Pipeline Explorer</h1>
+      <p class="intro">See how a language model turns words into numbers. First split text into tokens, then place whole sentences as points in 3D space.</p>
+    </header>
+
+    <!-- // WHAT THIS DOES: Part 1, the Tokenizer. Step one builds a word list
+         (vocabulary) from training sentences. Step two turns a new sentence
+         into tokens using that list. -->
+    <section class="part" aria-labelledby="part1-title">
+      <span class="part-num">Part 1</span>
+      <h2 id="part1-title">Tokenizer</h2>
+
+      <div class="field">
+        <label for="trainText">Training sentences</label>
+        <textarea id="trainText" rows="7" spellcheck="false">the cat sat on the mat
+the dog ran in the park
+a bird sang in the tree
+the cat ate the fish
+a dog sat on the rug
+the sun is warm today</textarea>
+        <p class="hint">One sentence per line. Every word here goes into the vocabulary.</p>
+      </div>
+      <button type="button" class="btn" id="buildVocabBtn">Build vocabulary</button>
+
+      <!-- // WHAT THIS DOES: Empty box that fills up with the vocabulary size
+           and the ID | token | count table after you click the button. -->
+      <div class="result" id="vocabResult" hidden>
+        <p class="result-msg" id="vocabMsg" role="status"></p>
+
+        <!-- // WHAT THIS DOES: The slider that chooses how many of the most
+             frequent words to keep in the vocabulary. -->
+        <div class="slider-field" id="keepField">
+          <label for="keepSlider">Words kept: <strong id="keepCount">0</strong> of <strong id="keepTotal">0</strong></label>
+          <input type="range" id="keepSlider" min="1" max="1" value="1" step="1">
+        </div>
+
+        <div class="table-box" id="vocabTableBox" tabindex="0" aria-label="Vocabulary table, scrollable">
+          <table class="vocab-table">
+            <thead>
+              <tr>
+                <th scope="col" class="num">ID</th>
+                <th scope="col">Token</th>
+                <th scope="col" class="num">Count</th>
+              </tr>
+            </thead>
+            <tbody id="vocabBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="field">
+        <label for="encodeText">Encode a sentence</label>
+        <input type="text" id="encodeText" value="the cat sat on the sofa" spellcheck="false" autocomplete="off">
+        <p class="hint">"sofa" is not in the training sentences, so the tokenizer has never seen it.</p>
+      </div>
+      <button type="button" class="btn" id="tokenizeBtn">Tokenize</button>
+
+      <!-- // WHAT THIS DOES: Empty box that fills up with the token chips,
+           the note about unknown words, and the three counts after you
+           click "Tokenize". -->
+      <div class="result" id="tokenResult" hidden>
+        <p class="result-msg" id="tokenMsg" role="status"></p>
+        <ul class="chips" id="tokenChips" aria-label="Tokens"></ul>
+        <p class="note" id="unknownNote" hidden>Unknown words are broken into smaller pieces.</p>
+        <dl class="stats" id="tokenStats">
+          <div><dt>Characters</dt><dd id="statChars">0</dd></div>
+          <div><dt>Tokens</dt><dd id="statTokens">0</dd></div>
+          <div><dt>Characters per token</dt><dd id="statRatio">0</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- // WHAT THIS DOES: Part 2, Embeddings in 3D. Each sentence will become
+         a point in 3D space. Similar sentences should end up close together. -->
+    <section class="part" aria-labelledby="part2-title">
+      <span class="part-num">Part 2</span>
+      <h2 id="part2-title">Embeddings in 3D</h2>
+
+      <div class="field">
+        <label for="embedText">Sentences (one per line)</label>
+        <textarea id="embedText" rows="11" spellcheck="false">The cat sat on the mat.
+A kitten rested on the rug.
+The bat sat on the mat.
+I love programming in Python.
+Coding in Python is my passion.
+Pythons are large snakes.
+The stock market crashed today.
+Share prices fell sharply.</textarea>
+      </div>
+
+      <!-- // WHAT THIS DOES: Lets the user choose how sentences are compared:
+           by their letters (spelling) or by what they mean. -->
+      <fieldset>
+        <legend class="group-label">How to compare sentences</legend>
+        <div class="radio-row">
+          <label class="radio-option">
+            <input type="radio" name="embedMode" value="spelling" checked>
+            Spelling-based
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="embedMode" value="meaning">
+            Meaning-based
+          </label>
+        </div>
+      </fieldset>
+
+      <button type="button" class="btn" id="embedBtn">Embed and plot</button>
+
+      <!-- // WHAT THIS DOES: A message line for problems, such as fewer than
+           4 sentences. It stays empty when everything works. -->
+      <p class="result-msg is-error" id="embedMsg" role="status" hidden></p>
+
+      <!-- // WHAT THIS DOES: Shows how much of the meaning model has been
+           downloaded. Only visible while the model is downloading. -->
+      <div class="progress-box" id="modelProgress" hidden>
+        <p class="progress-text" id="modelProgressText">Downloading model…</p>
+        <div class="progress-track" role="progressbar" aria-label="Model download" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="modelProgressBar">
+          <div class="progress-fill" id="modelProgressFill"></div>
+        </div>
+      </div>
+
+      <div class="chart-area" id="chartArea" role="img" aria-label="3D chart area, empty until you click Embed and plot">
+        The 3D chart will appear here.
+      </div>
+
+      <!-- // WHAT THIS DOES: The "Closest pairs" table. It lists the 5 pairs
+           of sentences whose number lists point in the most similar
+           direction. Hidden until a chart has been drawn. -->
+      <div class="pairs" id="pairsBox" hidden>
+        <h3>Closest pairs</h3>
+        <p class="hint" id="pairsMode"></p>
+        <div class="table-box">
+          <table class="vocab-table pairs-table">
+            <thead>
+              <tr>
+                <th scope="col" class="num">#</th>
+                <th scope="col">Sentence A</th>
+                <th scope="col">Sentence B</th>
+                <th scope="col" class="num">Similarity</th>
+              </tr>
+            </thead>
+            <tbody id="pairsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- // WHAT THIS DOES: "Try your own". Type any word or sentence and
+           see its tokens, add it to the chart as an orange dot, and see
+           which sentences it is closest to. -->
+      <div class="field">
+        <label for="ownText">Try your own word or sentence</label>
+        <input type="text" id="ownText" value="My kitten sleeps on the sofa." spellcheck="false" autocomplete="off">
+      </div>
+      <button type="button" class="btn" id="ownBtn">Tokenize, embed &amp; add to plot</button>
+
+      <div class="result" id="ownResult" hidden>
+        <p class="result-msg is-error" id="ownMsg" role="status" hidden></p>
+        <ul class="chips" id="ownChips" aria-label="Tokens of your sentence"></ul>
+
+        <!-- // WHAT THIS DOES: Shows the first 8 numbers of your sentence's
+             vector and its 3 closest sentences. Filled in after the chart
+             is drawn. -->
+        <div id="ownEmbedResult" hidden>
+          <p class="result-msg" id="ownVectorLabel">First 8 numbers</p>
+          <p class="vector-line" id="ownVector"></p>
+          <div class="pairs own-closest">
+            <h3>Its 3 closest sentences</h3>
+            <div class="table-box">
+              <table class="vocab-table pairs-table">
+                <thead>
+                  <tr>
+                    <th scope="col" class="num">#</th>
+                    <th scope="col">Sentence</th>
+                    <th scope="col" class="num">Similarity</th>
+                  </tr>
+                </thead>
+                <tbody id="ownClosestBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // WHAT THIS DOES: These variables hold the vocabulary after you click
+    // "Build vocabulary". Later stages (like "Tokenize") will read them.
+    // vocabList is a list of tokens in ID order: vocabList[0] is "[UNK]".
+    // wordToId lets us look up a word's ID quickly, e.g. wordToId["cat"].
+    let vocabList = [];
+    let wordToId = {};
+
+    // WHAT THIS DOES: Remembers the FULL sorted word list and the counts,
+    // so the slider can keep fewer words and then go back up again.
+    // hasTokenized is true once "Tokenize" has worked, so dragging the
+    // slider knows it should re-tokenize the sentence live.
+    let allSortedWords = [];
+    let allCounts = {};
+    let hasTokenized = false;
+
+
+    // WHAT THIS DOES: Steps 1 and 2.
+    // Makes the text lowercase, then puts a space before and after
+    // each punctuation mark so it becomes its own separate token.
+    // Example: "Hi, cat!" becomes "hi ,  cat ! "
+    function cleanText(text) {
+      const punctuation = [".", ",", "!", "?", "'"];
+      let lower = text.toLowerCase();
+      let result = "";
+
+      for (let i = 0; i < lower.length; i++) {
+        let ch = lower[i];
+        if (punctuation.includes(ch)) {
+          result = result + " " + ch + " ";
+        } else if (ch === "\n" || ch === "\t") {
+          // A new line also separates words, so treat it like a space.
+          result = result + " ";
+        } else {
+          result = result + ch;
+        }
+      }
+      return result;
+    }
+
+
+    // WHAT THIS DOES: Step 3.
+    // Splits the text on spaces into a list of words.
+    // Several spaces in a row would make empty pieces, so we skip those.
+    function splitIntoWords(text) {
+      let pieces = text.split(" ");
+      let words = [];
+
+      for (let i = 0; i < pieces.length; i++) {
+        if (pieces[i] !== "") {
+          words.push(pieces[i]);
+        }
+      }
+      return words;
+    }
+
+
+    // WHAT THIS DOES: Step 4.
+    // Counts how many times each word appears, then sorts the words
+    // so the most frequent comes first. Words with the same count stay
+    // in the order they first appeared in the text.
+    function countWords(words) {
+      let counts = {};        // e.g. { "the": 7, "cat": 2 }
+      let uniqueWords = [];   // each word once, in first-seen order
+
+      for (let i = 0; i < words.length; i++) {
+        let w = words[i];
+        if (counts[w] === undefined) {
+          counts[w] = 1;
+          uniqueWords.push(w);
+        } else {
+          counts[w] = counts[w] + 1;
+        }
+      }
+
+      // Sort: bigger count first.
+      uniqueWords.sort(function (a, b) {
+        return counts[b] - counts[a];
+      });
+
+      return { counts: counts, sortedWords: uniqueWords };
+    }
+
+
+    // WHAT THIS DOES: Step 5.
+    // Gives every word an ID number. ID 0 is always [UNK], which stands
+    // for "unknown word". Then the words get IDs 1, 2, 3... in sorted order.
+    function assignIds(sortedWords) {
+      vocabList = ["[UNK]"];
+      wordToId = { "[UNK]": 0 };
+
+      for (let i = 0; i < sortedWords.length; i++) {
+        let word = sortedWords[i];
+        vocabList.push(word);
+        wordToId[word] = vocabList.length - 1;
+      }
+    }
+
+
+    // WHAT THIS DOES: Draws the ID | token | count table and the
+    // vocabulary size line on the page.
+    function showVocabTable(counts) {
+      const body = document.getElementById("vocabBody");
+      const msg = document.getElementById("vocabMsg");
+      let rows = "";
+
+      for (let id = 0; id < vocabList.length; id++) {
+        let token = vocabList[id];
+        let count = (id === 0) ? "–" : counts[token];
+        let rowClass = (id === 0) ? ' class="unk"' : "";
+        rows = rows + "<tr" + rowClass + ">" +
+          '<td class="num">' + id + "</td>" +
+          "<td>" + escapeHtml(token) + "</td>" +
+          '<td class="num">' + count + "</td>" +
+          "</tr>";
+      }
+
+      body.innerHTML = rows;
+      msg.classList.remove("is-error");
+      msg.innerHTML = "Vocabulary size: <strong>" + vocabList.length +
+        "</strong> tokens (" + (vocabList.length - 1) + " words + [UNK])";
+      document.getElementById("vocabTableBox").hidden = false;
+      document.getElementById("vocabResult").hidden = false;
+      document.getElementById("vocabTableBox").scrollTop = 0;
+    }
+
+
+    // WHAT THIS DOES: Makes text safe to put inside the table, so a
+    // character like < or & shows as text instead of breaking the page.
+    function escapeHtml(text) {
+      return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+
+    // WHAT THIS DOES: Runs all five steps, in order, when you click
+    // "Build vocabulary". If the box is empty, it shows a message instead.
+    function buildVocabulary() {
+      const text = document.getElementById("trainText").value;
+
+      const cleaned = cleanText(text);          // steps 1 and 2
+      const words = splitIntoWords(cleaned);    // step 3
+
+      if (words.length === 0) {
+        const msg = document.getElementById("vocabMsg");
+        msg.textContent = "The training box is empty. Type at least one sentence, then click Build vocabulary.";
+        msg.classList.add("is-error");
+        document.getElementById("vocabTableBox").hidden = true;
+        document.getElementById("keepField").hidden = true;
+        document.getElementById("vocabResult").hidden = false;
+        vocabList = [];
+        wordToId = {};
+        allSortedWords = [];
+        allCounts = {};
+        return;
+      }
+
+      const result = countWords(words);         // step 4
+      allSortedWords = result.sortedWords;
+      allCounts = result.counts;
+
+      // Set up the slider: from 1 word up to all of them, starting at all.
+      const slider = document.getElementById("keepSlider");
+      slider.max = allSortedWords.length;
+      slider.value = allSortedWords.length;
+      document.getElementById("keepTotal").textContent = allSortedWords.length;
+      document.getElementById("keepField").hidden = false;
+
+      applyWordsKept();                         // step 5 + table
+    }
+
+
+    // WHAT THIS DOES: Runs when the vocabulary is built and every time the
+    // slider moves. It keeps only the top N most frequent words, gives
+    // them new IDs, redraws the table, and re-tokenizes the sentence if
+    // you have already clicked "Tokenize".
+    function applyWordsKept() {
+      const n = Number(document.getElementById("keepSlider").value);
+      document.getElementById("keepCount").textContent = n;
+
+      // slice(0, n) = the first n words of the sorted list.
+      assignIds(allSortedWords.slice(0, n));    // step 5
+      showVocabTable(allCounts);
+
+      if (hasTokenized) {
+        tokenize();
+      }
+    }
+
+
+    // WHAT THIS DOES: Runs applyWordsKept() every time the slider moves,
+    // including while you are still dragging it ("input" event).
+    document.getElementById("keepSlider").addEventListener("input", applyWordsKept);
+
+
+    // WHAT THIS DOES: Connects the button to the function above,
+    // so clicking it runs buildVocabulary().
+    document.getElementById("buildVocabBtn").addEventListener("click", buildVocabulary);
+
+
+    // WHAT THIS DOES: Looks up a token's ID. If the token is not in the
+    // vocabulary, it returns 0, which is the ID of [UNK] (unknown).
+    function getId(token) {
+      if (wordToId[token] !== undefined) {
+        return wordToId[token];
+      }
+      return 0;
+    }
+
+
+    // WHAT THIS DOES: Breaks an unknown word into single letters.
+    // The first letter stays as it is. Every other letter gets "##" in
+    // front, which means "this piece is glued to the piece before it".
+    // Example: "zebra" becomes ["z", "##e", "##b", "##r", "##a"]
+    function splitIntoPieces(word) {
+      let pieces = [];
+      for (let i = 0; i < word.length; i++) {
+        if (i === 0) {
+          pieces.push(word[i]);
+        } else {
+          pieces.push("##" + word[i]);
+        }
+      }
+      return pieces;
+    }
+
+
+    // WHAT THIS DOES: Picks a colour from an ID number, so the same ID
+    // (and therefore the same word) always gets the same colour.
+    // Multiplying by 137.5 spreads neighbouring IDs far apart on the
+    // colour wheel, so ID 1 and ID 2 don't look almost the same.
+    // ID 0 ([UNK]) is always plain grey.
+    function colourForId(id) {
+      if (id === 0) {
+        return "#e4e4e2";
+      }
+      let hue = (id * 137.5) % 360;
+      return "hsl(" + hue + ", 70%, 86%)";
+    }
+
+
+    // WHAT THIS DOES: Turns any text into a list of tokens using the
+    // current vocabulary. Known words become one token each; unknown words
+    // are broken into letter pieces. Each token remembers its text, its ID,
+    // and whether it is a piece. Used by "Tokenize" AND by Part 3.
+    function tokenizeText(text) {
+      const words = splitIntoWords(cleanText(text));
+      let tokens = [];
+      let foundUnknown = false;
+
+      for (let i = 0; i < words.length; i++) {
+        let word = words[i];
+        if (wordToId[word] !== undefined) {
+          tokens.push({ text: word, id: wordToId[word], piece: false });
+        } else {
+          foundUnknown = true;
+          let pieces = splitIntoPieces(word);
+          for (let j = 0; j < pieces.length; j++) {
+            tokens.push({ text: pieces[j], id: getId(pieces[j]), piece: true });
+          }
+        }
+      }
+      return { tokens: tokens, foundUnknown: foundUnknown };
+    }
+
+
+    // WHAT THIS DOES: Draws one coloured chip per token inside a list
+    // element on the page. Used by "Tokenize" AND by Part 3.
+    function renderChips(listElement, tokens) {
+      let html = "";
+      for (let i = 0; i < tokens.length; i++) {
+        let t = tokens[i];
+        let pieceClass = t.piece ? " is-piece" : "";
+        html = html +
+          '<li class="chip' + pieceClass + '" style="background:' + colourForId(t.id) + '">' +
+          '<span class="chip-word">' + escapeHtml(t.text) + "</span>" +
+          '<span class="chip-id">' + t.id + "</span>" +
+          "</li>";
+      }
+      listElement.innerHTML = html;
+    }
+
+
+    // WHAT THIS DOES: Shows a message in the Tokenize result area instead
+    // of chips, for example when the vocabulary has not been built yet.
+    function showTokenMessage(text) {
+      const msg = document.getElementById("tokenMsg");
+      msg.textContent = text;
+      msg.classList.add("is-error");
+      msg.hidden = false;
+      document.getElementById("tokenChips").hidden = true;
+      document.getElementById("unknownNote").hidden = true;
+      document.getElementById("tokenStats").hidden = true;
+      document.getElementById("tokenResult").hidden = false;
+    }
+
+
+    // WHAT THIS DOES: Runs when you click "Tokenize".
+    // 1. Cleans and splits the sentence the same way as the vocabulary.
+    // 2. Known words become one token each.
+    // 3. Unknown words are broken into letter pieces.
+    // 4. Draws a chip for every token and shows the three counts.
+    function tokenize() {
+      if (vocabList.length === 0) {
+        showTokenMessage("Build the vocabulary first: click Build vocabulary above, then click Tokenize again.");
+        return;
+      }
+
+      const sentence = document.getElementById("encodeText").value;
+      const result = tokenizeText(sentence);
+
+      if (result.tokens.length === 0) {
+        showTokenMessage("The sentence box is empty. Type a sentence, then click Tokenize.");
+        return;
+      }
+
+      const tokens = result.tokens;
+      const foundUnknown = result.foundUnknown;
+
+      // Work out the three numbers.
+      // Characters counts every character you typed, spaces included.
+      let charCount = sentence.length;
+      let tokenCount = tokens.length;
+      let perToken = (charCount / tokenCount).toFixed(2);
+
+      document.getElementById("tokenMsg").hidden = true;
+      renderChips(document.getElementById("tokenChips"), tokens);
+      document.getElementById("tokenChips").hidden = false;
+      document.getElementById("unknownNote").hidden = !foundUnknown;
+      document.getElementById("statChars").textContent = charCount;
+      document.getElementById("statTokens").textContent = tokenCount;
+      document.getElementById("statRatio").textContent = perToken;
+      document.getElementById("tokenStats").hidden = false;
+      document.getElementById("tokenResult").hidden = false;
+      hasTokenized = true;
+    }
+
+
+    // WHAT THIS DOES: Connects the Tokenize button to the function above.
+    document.getElementById("tokenizeBtn").addEventListener("click", tokenize);
+
+
+    // ============================================================
+    // PART 2: EMBEDDINGS IN 3D
+    // ============================================================
+
+    // WHAT THIS DOES: Loads Plotly.js (version 4.2.0), the library that
+    // draws the 3D chart. The file is big (about 4 MB), so it can take a
+    // few seconds. We try the official CDN (cdn.plot.ly) first. If that
+    // fails or is blocked, we try a backup copy of the same version.
+    // plotlyStatus is "loading", then "ready" or "failed".
+    const PLOTLY_URLS = [
+      "https://cdn.plot.ly/plotly-4.2.0.min.js",
+      "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@4.2.0/"
+    ];
+    let plotlyStatus = "loading";
+    let plotWaiting = false;   // true if you clicked before Plotly was ready
+
+    function loadPlotly(index) {
+      if (index >= PLOTLY_URLS.length) {
+        plotlyStatus = "failed";
+        if (plotWaiting) {
+          plotWaiting = false;
+          embedAndPlot();      // shows the "could not load" message
+        }
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = PLOTLY_URLS[index];
+      script.charset = "utf-8";
+      script.onload = function () {
+        plotlyStatus = "ready";
+        if (plotWaiting) {
+          plotWaiting = false;
+          embedAndPlot();      // draw the chart you asked for
+        }
+      };
+      script.onerror = function () {
+        loadPlotly(index + 1); // try the next address
+      };
+      document.head.appendChild(script);
+    }
+
+    loadPlotly(0);
+
+
+    // WHAT THIS DOES: The size of each sentence's number list.
+    // Every sentence becomes a list of exactly 64 numbers.
+    const VECTOR_SIZE = 64;
+
+
+    // WHAT THIS DOES: Turns any 3 letters into a number from 0 to 63.
+    // This is a "hash": the same 3 letters always give the same number.
+    // For each letter: multiply the running total by 31, add the letter's
+    // code, and keep only the remainder after dividing by 64.
+    // Different letter groups can land on the same number. That is fine.
+    function hashTrigram(trigram) {
+      let h = 0;
+      for (let i = 0; i < trigram.length; i++) {
+        h = (h * 31 + trigram.charCodeAt(i)) % VECTOR_SIZE;
+      }
+      return h;
+    }
+
+
+    // WHAT THIS DOES: Turns one sentence into 64 numbers based on spelling.
+    // 1. Lowercase it, and keep only letters, digits and spaces.
+    // 2. Add a space at the start and end, so word edges count too.
+    // 3. Slide a window 3 characters wide along the text, one step at a time.
+    //    "the cat" gives " th", "the", "he ", "e c", " ca", "cat", "at ".
+    // 4. For each group of 3, add 1 to the box that its hash points to.
+    function spellingVector(sentence) {
+      let lower = sentence.toLowerCase();
+      let text = "";
+
+      for (let i = 0; i < lower.length; i++) {
+        let ch = lower[i];
+        let isLetter = ch >= "a" && ch <= "z";
+        let isDigit = ch >= "0" && ch <= "9";
+        if (isLetter || isDigit) {
+          text = text + ch;
+        } else if (!text.endsWith(" ")) {
+          // Anything else (space, full stop, comma...) becomes one space.
+          text = text + " ";
+        }
+      }
+      text = " " + text.trim() + " ";
+
+      let vector = [];
+      for (let i = 0; i < VECTOR_SIZE; i++) {
+        vector.push(0);
+      }
+
+      for (let i = 0; i + 3 <= text.length; i++) {
+        let trigram = text.substring(i, i + 3);
+        let box = hashTrigram(trigram);
+        vector[box] = vector[box] + 1;
+      }
+
+      return scaleToLengthOne(vector);
+    }
+
+
+    // WHAT THIS DOES: Scales a list of numbers so its "length" is 1.
+    // Length = square root of (each number squared, all added up).
+    // Dividing every number by the length makes long and short sentences
+    // comparable: only the pattern matters, not how many letters there are.
+    function scaleToLengthOne(vector) {
+      let sumOfSquares = 0;
+      for (let i = 0; i < vector.length; i++) {
+        sumOfSquares = sumOfSquares + vector[i] * vector[i];
+      }
+      let length = Math.sqrt(sumOfSquares);
+
+      let result = [];
+      for (let i = 0; i < vector.length; i++) {
+        if (length === 0) {
+          result.push(0);
+        } else {
+          result.push(vector[i] / length);
+        }
+      }
+      return result;
+    }
+
+
+    // WHAT THIS DOES: Small helper. Multiplies two lists number by number
+    // and adds up the results (called a "dot product").
+    function dot(a, b) {
+      let total = 0;
+      for (let i = 0; i < a.length; i++) {
+        total = total + a[i] * b[i];
+      }
+      return total;
+    }
+
+
+    // WHAT THIS DOES: Shrinks every 64-number list down to 3 numbers
+    // (x, y, z) using PCA ("principal component analysis").
+    // The idea: find the 3 directions in which the sentences differ the
+    // most, then measure each sentence along those 3 directions.
+    //
+    // Steps:
+    // 1. Centre the data: subtract the average sentence from every sentence.
+    // 2. Build a 64 x 64 table (the "covariance") that says which of the 64
+    //    numbers tend to go up and down together.
+    // 3. Find the strongest direction with "power iteration": start with
+    //    any direction, multiply it by the table again and again, and it
+    //    turns towards the strongest direction by itself.
+    // 4. Remove that direction from the table and repeat for the 2nd and 3rd.
+    // 5. Each sentence's x, y, z = how far it lies along each direction.
+    function reduceTo3D(vectors) {
+      const n = vectors.length;
+      const size = vectors[0].length;
+
+      // Step 1: centre the data.
+      let average = [];
+      for (let j = 0; j < size; j++) {
+        let sum = 0;
+        for (let i = 0; i < n; i++) {
+          sum = sum + vectors[i][j];
+        }
+        average.push(sum / n);
+      }
+      let centred = [];
+      for (let i = 0; i < n; i++) {
+        let row = [];
+        for (let j = 0; j < size; j++) {
+          row.push(vectors[i][j] - average[j]);
+        }
+        centred.push(row);
+      }
+
+      // Step 2: build the covariance table.
+      let cov = [];
+      for (let a = 0; a < size; a++) {
+        let row = [];
+        for (let b = 0; b < size; b++) {
+          let sum = 0;
+          for (let i = 0; i < n; i++) {
+            sum = sum + centred[i][a] * centred[i][b];
+          }
+          row.push(sum / n);
+        }
+        cov.push(row);
+      }
+
+      // Steps 3 and 4: find 3 directions, one after another.
+      let directions = [];
+      for (let d = 0; d < 3; d++) {
+        // Start direction: any fixed list works (same start = same chart).
+        let v = [];
+        for (let j = 0; j < size; j++) {
+          v.push(1 / (j + 1));
+        }
+
+        let strength = 0;
+        for (let step = 0; step < 200; step++) {
+          // Multiply the table by v.
+          let next = [];
+          for (let a = 0; a < size; a++) {
+            next.push(dot(cov[a], v));
+          }
+          // Make it length 1 again so the numbers don't grow forever.
+          strength = Math.sqrt(dot(next, next));
+          if (strength < 1e-12) {
+            break;   // nothing left to find (sentences too similar)
+          }
+          for (let j = 0; j < size; j++) {
+            v[j] = next[j] / strength;
+          }
+        }
+
+        if (strength < 1e-12) {
+          // No more spread in the data: use an all-zero direction.
+          v = [];
+          for (let j = 0; j < size; j++) {
+            v.push(0);
+          }
+        }
+        directions.push(v);
+
+        // Step 4: remove this direction from the table.
+        for (let a = 0; a < size; a++) {
+          for (let b = 0; b < size; b++) {
+            cov[a][b] = cov[a][b] - strength * v[a] * v[b];
+          }
+        }
+      }
+
+      // Step 5: measure each sentence along the 3 directions.
+      let points = [];
+      for (let i = 0; i < n; i++) {
+        points.push({
+          x: dot(centred[i], directions[0]),
+          y: dot(centred[i], directions[1]),
+          z: dot(centred[i], directions[2])
+        });
+      }
+      return points;
+    }
+
+
+    // WHAT THIS DOES: Makes a short label for a dot: the first 3 words
+    // of the sentence, with "…" if the sentence is longer.
+    function shortLabel(sentence) {
+      let words = sentence.split(" ");
+      if (words.length <= 3) {
+        return sentence;
+      }
+      return words[0] + " " + words[1] + " " + words[2] + "…";
+    }
+
+
+    // WHAT THIS DOES: Shows or hides the message under the button.
+    // isError = true shows it in red; false shows it in normal grey.
+    function showEmbedMessage(text, isError) {
+      const msg = document.getElementById("embedMsg");
+      msg.textContent = text;
+      msg.hidden = (text === "");
+      if (isError === false) {
+        msg.classList.remove("is-error");
+      } else {
+        msg.classList.add("is-error");
+      }
+    }
+
+
+    // WHAT THIS DOES: Puts the chart box back to its empty starting look.
+    function resetChart() {
+      const area = document.getElementById("chartArea");
+      if (typeof Plotly !== "undefined") {
+        Plotly.purge(area);
+      }
+      area.classList.remove("has-plot");
+      area.textContent = "The 3D chart will appear here.";
+    }
+
+
+    // WHAT THIS DOES: Draws the 3D chart with Plotly: one dot per sentence,
+    // the short label beside it, and the full sentence when you hover.
+    // highlightIndex = which dot to draw bigger and orange (your own
+    // sentence from Part 3), or -1 for none.
+    function drawChart(sentences, points, highlightIndex) {
+      let xs = [], ys = [], zs = [], labels = [], sizes = [], colours = [];
+      for (let i = 0; i < points.length; i++) {
+        xs.push(points[i].x);
+        ys.push(points[i].y);
+        zs.push(points[i].z);
+        labels.push(shortLabel(sentences[i]));
+        if (i === highlightIndex) {
+          sizes.push(11);
+          colours.push("#f34213");   // orange: your own sentence
+        } else {
+          sizes.push(6);
+          colours.push("#181818");
+        }
+      }
+
+      const trace = {
+        type: "scatter3d",
+        mode: "markers+text",
+        x: xs, y: ys, z: zs,
+        text: labels,                 // short label beside each dot
+        hovertext: sentences,         // full sentence on hover
+        hovertemplate: "%{hovertext}<extra></extra>",
+        textposition: "top center",
+        textfont: { size: 12, color: "#373735" },
+        marker: { size: sizes, color: colours, opacity: 0.9 }
+      };
+
+      const axis = {
+        title: { text: "" },
+        showticklabels: false,
+        gridcolor: "rgba(24,24,24,0.10)",
+        zerolinecolor: "rgba(24,24,24,0.25)",
+        backgroundcolor: "#fff",
+        showbackground: true
+      };
+
+      const layout = {
+        margin: { l: 0, r: 0, t: 0, b: 0 },
+        paper_bgcolor: "#fff",
+        font: { family: "Geist, Inter, system-ui, sans-serif", color: "#181818" },
+        hoverlabel: { bgcolor: "#181818", font: { color: "#fcfcfc" } },
+        scene: {
+          xaxis: Object.assign({}, axis, { title: { text: "x" } }),
+          yaxis: Object.assign({}, axis, { title: { text: "y" } }),
+          zaxis: Object.assign({}, axis, { title: { text: "z" } })
+        }
+      };
+
+      const area = document.getElementById("chartArea");
+      area.textContent = "";
+      area.classList.add("has-plot");
+      area.setAttribute("aria-label", "3D chart with " + points.length + " sentences. Drag to rotate, hover a dot to read its sentence.");
+      Plotly.newPlot(area, [trace], layout, { responsive: true, displaylogo: false });
+    }
+
+
+    // WHAT THIS DOES: Measures how similar two number lists are, using
+    // "cosine similarity". It looks at the angle between the two lists:
+    // 1 = pointing the same way (very similar), 0 = unrelated.
+    // Formula: dot(a, b) / (length of a × length of b)
+    function cosineSimilarity(a, b) {
+      let lengthA = Math.sqrt(dot(a, a));
+      let lengthB = Math.sqrt(dot(b, b));
+      if (lengthA === 0 || lengthB === 0) {
+        return 0;
+      }
+      return dot(a, b) / (lengthA * lengthB);
+    }
+
+
+    // WHAT THIS DOES: Compares every sentence with every other sentence,
+    // sorts the pairs from most to least similar, and shows the top 5
+    // in the "Closest pairs" table. It uses the FULL number lists
+    // (64 or 384 numbers), not the 3 numbers shown on the chart.
+    function showClosestPairs(sentences, vectors, modeText) {
+      let pairs = [];
+      for (let i = 0; i < sentences.length; i++) {
+        for (let j = i + 1; j < sentences.length; j++) {
+          pairs.push({ a: i, b: j, score: cosineSimilarity(vectors[i], vectors[j]) });
+        }
+      }
+
+      pairs.sort(function (p, q) {
+        return q.score - p.score;
+      });
+
+      let rows = "";
+      let howMany = Math.min(5, pairs.length);
+      for (let k = 0; k < howMany; k++) {
+        let p = pairs[k];
+        rows = rows + "<tr>" +
+          '<td class="num">' + (k + 1) + "</td>" +
+          '<td class="text">' + escapeHtml(sentences[p.a]) + "</td>" +
+          '<td class="text">' + escapeHtml(sentences[p.b]) + "</td>" +
+          '<td class="num">' + p.score.toFixed(3) + "</td>" +
+          "</tr>";
+      }
+
+      document.getElementById("pairsBody").innerHTML = rows;
+      document.getElementById("pairsMode").textContent = modeText;
+      document.getElementById("pairsBox").hidden = false;
+    }
+
+
+    // ============================================================
+    // MEANING-BASED MODE (transformers.js)
+    // ============================================================
+
+    // WHAT THIS DOES: Where to load transformers.js from, and which model
+    // to use. all-MiniLM-L6-v2 is a small model (about 23 MB) that turns a
+    // sentence into 384 numbers based on what it MEANS, not how it is spelled.
+    const TRANSFORMERS_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1";
+    const MODEL_NAME = "Xenova/all-MiniLM-L6-v2";
+    const FALLBACK_MESSAGE = "Meaning mode needs the page served over http - using spelling-based instead";
+    let extractor = null;   // the loaded model, kept so we only download it once
+
+
+    // WHAT THIS DOES: Updates the download bar. Transformers.js calls this
+    // again and again while it downloads the model files.
+    // "progress_total" = overall progress for all files together.
+    // "progress" = progress for one file (used if no total is sent).
+    let sawTotal = false;
+    function onModelProgress(info) {
+      let percent = null;
+      let label = "";
+
+      if (info.status === "progress_total") {
+        sawTotal = true;
+        percent = info.progress;
+        label = "Downloading meaning model: ";
+      } else if (info.status === "progress" && !sawTotal) {
+        percent = info.progress;
+        label = "Downloading " + info.file + ": ";
+      } else if (info.status === "ready") {
+        percent = 100;
+        label = "Model ready: ";
+      }
+
+      if (percent === null || isNaN(percent)) {
+        return;
+      }
+      percent = Math.max(0, Math.min(100, percent));
+
+      let text = label + Math.round(percent) + "%";
+      if (info.total) {
+        let mb = function (bytes) { return (bytes / 1048576).toFixed(1); };
+        text = text + " (" + mb(info.loaded) + " of " + mb(info.total) + " MB)";
+      }
+      document.getElementById("modelProgressText").textContent = text;
+      document.getElementById("modelProgressFill").style.transform = "scaleX(" + (percent / 100) + ")";
+      document.getElementById("modelProgressBar").setAttribute("aria-valuenow", Math.round(percent));
+    }
+
+
+    // WHAT THIS DOES: Downloads transformers.js and the model the first
+    // time you need them. After that it reuses the model straight away.
+    async function getExtractor() {
+      if (extractor !== null) {
+        return extractor;
+      }
+      sawTotal = false;
+      document.getElementById("modelProgressText").textContent = "Loading transformers.js…";
+      document.getElementById("modelProgressFill").style.transform = "scaleX(0)";
+      document.getElementById("modelProgress").hidden = false;
+
+      try {
+        const transformers = await import(TRANSFORMERS_URL);
+        extractor = await transformers.pipeline("feature-extraction", MODEL_NAME, {
+          progress_callback: onModelProgress
+        });
+      } finally {
+        document.getElementById("modelProgress").hidden = true;
+      }
+      return extractor;
+    }
+
+
+    // WHAT THIS DOES: Turns every sentence into 384 numbers using the model.
+    // pooling "mean" = average the numbers of all the words in the sentence.
+    // normalize true = scale the list so its length is 1 (same as spelling mode).
+    async function meaningVectors(sentences) {
+      const model = await getExtractor();
+      const output = await model(sentences, { pooling: "mean", normalize: true });
+      return output.tolist();
+    }
+
+
+    // WHAT THIS DOES: Turns the "Embed and plot" button into its busy look
+    // (grey, spinner, can't be clicked twice) and back again.
+    function setEmbedBusy(isBusy) {
+      const buttons = [document.getElementById("embedBtn"), document.getElementById("ownBtn")];
+      for (let i = 0; i < buttons.length; i++) {
+        buttons[i].disabled = isBusy;
+        buttons[i].setAttribute("aria-busy", isBusy ? "true" : "false");
+      }
+    }
+
+
+    // WHAT THIS DOES: Runs when you click "Embed and plot".
+    // 1. Checks there are at least 4 sentences and that Plotly is ready.
+    // 2. Turns each sentence into numbers (spelling or meaning).
+    //    If meaning mode fails, it switches to spelling by itself.
+    // 3. Shrinks the numbers to 3, draws the chart, fills the pairs table.
+    async function embedAndPlot() {
+      // Read the sentences, one per line, skipping empty lines.
+      const lines = document.getElementById("embedText").value.split("\n");
+      let sentences = [];
+      for (let i = 0; i < lines.length; i++) {
+        let s = lines[i].trim();
+        if (s !== "") {
+          sentences.push(s);
+        }
+      }
+
+      if (sentences.length < 4) {
+        showEmbedMessage("Add at least 4 sentences (one per line). You have " + sentences.length + ".");
+        resetChart();
+        document.getElementById("pairsBox").hidden = true;
+        return;
+      }
+
+      // Plotly is still downloading: wait, and draw as soon as it arrives.
+      if (plotlyStatus === "loading") {
+        showEmbedMessage("Loading the chart library (about 4 MB). The chart will appear by itself in a few seconds.", false);
+        plotWaiting = true;
+        return;
+      }
+
+      if (plotlyStatus === "failed") {
+        showEmbedMessage("The chart library could not be downloaded from cdn.plot.ly or the backup. Your network or browser may be blocking it. Try another network, or turn off any ad or script blocker for this page, then reload.");
+        return;
+      }
+
+      const mode = document.querySelector('input[name="embedMode"]:checked').value;
+      let vectors = null;
+      let modeText = "";
+      showEmbedMessage("");
+
+      // Meaning mode: try the model. If anything goes wrong, fall back.
+      if (mode === "meaning") {
+        setEmbedBusy(true);
+        try {
+          vectors = await meaningVectors(sentences);
+          modeText = "Meaning-based: 384 numbers per sentence. Score = cosine similarity, 1.000 is identical.";
+        } catch (error) {
+          console.error("Meaning mode failed:", error);
+          showEmbedMessage(FALLBACK_MESSAGE);
+          document.querySelector('input[name="embedMode"][value="spelling"]').checked = true;
+          vectors = null;
+        }
+        setEmbedBusy(false);
+      }
+
+      // Spelling mode (chosen, or used as the fallback).
+      if (vectors === null) {
+        vectors = [];
+        for (let i = 0; i < sentences.length; i++) {
+          vectors.push(spellingVector(sentences[i]));
+        }
+        modeText = "Spelling-based: 64 numbers per sentence. Score = cosine similarity, 1.000 is identical.";
+      }
+
+      // Is your own sentence from Part 3 in the list? Then highlight it.
+      const ownIndex = sentences.indexOf(ownSentence);
+
+      const points = reduceTo3D(vectors);
+      drawChart(sentences, points, ownIndex);
+      showClosestPairs(sentences, vectors, modeText);
+
+      if (ownIndex !== -1) {
+        showOwnResults(sentences, vectors, ownIndex);
+      }
+    }
+
+
+    // ============================================================
+    // PART 3: TRY YOUR OWN
+    // ============================================================
+
+    // WHAT THIS DOES: Remembers the sentence you typed in Part 3, so the
+    // chart can draw it as the orange dot (even if you click "Embed and
+    // plot" again later).
+    let ownSentence = null;
+
+
+    // WHAT THIS DOES: Shows the first 8 numbers of your sentence's vector,
+    // and its 3 closest sentences by cosine similarity (full vectors).
+    function showOwnResults(sentences, vectors, ownIndex) {
+      const ownVector = vectors[ownIndex];
+
+      // The first 8 numbers, each with 3 decimals.
+      let firstEight = [];
+      for (let i = 0; i < 8 && i < ownVector.length; i++) {
+        firstEight.push(ownVector[i].toFixed(3));
+      }
+      document.getElementById("ownVectorLabel").textContent =
+        "First 8 of its " + ownVector.length + " numbers";
+      document.getElementById("ownVector").textContent = "[" + firstEight.join(", ") + ", …]";
+
+      // Score every OTHER sentence against yours, then keep the top 3.
+      let scores = [];
+      for (let i = 0; i < sentences.length; i++) {
+        if (i !== ownIndex) {
+          scores.push({ index: i, score: cosineSimilarity(ownVector, vectors[i]) });
+        }
+      }
+      scores.sort(function (p, q) {
+        return q.score - p.score;
+      });
+
+      let rows = "";
+      for (let k = 0; k < 3 && k < scores.length; k++) {
+        rows = rows + "<tr>" +
+          '<td class="num">' + (k + 1) + "</td>" +
+          '<td class="text">' + escapeHtml(sentences[scores[k].index]) + "</td>" +
+          '<td class="num">' + scores[k].score.toFixed(3) + "</td>" +
+          "</tr>";
+      }
+      document.getElementById("ownClosestBody").innerHTML = rows;
+      document.getElementById("ownEmbedResult").hidden = false;
+    }
+
+
+    // WHAT THIS DOES: Runs when you click "Tokenize, embed & add to plot".
+    // 1. Shows the token chips (reuses tokenizeText and renderChips).
+    // 2. Adds the sentence to the Part 2 list (if it is not there yet).
+    // 3. Runs embedAndPlot(), which redraws the chart with your sentence
+    //    as the orange dot and fills in its numbers and closest sentences.
+    function tryOwnSentence() {
+      const text = document.getElementById("ownText").value.trim();
+      const msg = document.getElementById("ownMsg");
+
+      if (text === "") {
+        msg.textContent = "Type a word or sentence first.";
+        msg.hidden = false;
+        return;
+      }
+
+      // Step 1: token chips.
+      if (vocabList.length === 0) {
+        msg.textContent = "No vocabulary yet, so no tokens to show. Click Build vocabulary in Part 1 to see them. The chart below still works.";
+        msg.hidden = false;
+        document.getElementById("ownChips").hidden = true;
+      } else {
+        msg.hidden = true;
+        renderChips(document.getElementById("ownChips"), tokenizeText(text).tokens);
+        document.getElementById("ownChips").hidden = false;
+      }
+      document.getElementById("ownResult").hidden = false;
+
+      // Step 2: add it to the sentence list (one per line), unless the
+      // exact same sentence is already there.
+      const box = document.getElementById("embedText");
+      const lines = box.value.split("\n");
+      let alreadyThere = false;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() === text) {
+          alreadyThere = true;
+        }
+      }
+      if (!alreadyThere) {
+        box.value = box.value.trimEnd() + "\n" + text;
+      }
+
+      // Step 3: embed everything and redraw.
+      ownSentence = text;
+      embedAndPlot();
+    }
+
+
+    // WHAT THIS DOES: Connects the Part 3 button to the function above.
+    // Pressing Enter in the text box does the same thing.
+    document.getElementById("ownBtn").addEventListener("click", tryOwnSentence);
+    document.getElementById("ownText").addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        tryOwnSentence();
+      }
+    });
+
+
+    // WHAT THIS DOES: Connects the "Embed and plot" button to the function above.
+    document.getElementById("embedBtn").addEventListener("click", embedAndPlot);
+  </script>
+</body>
+</html>
